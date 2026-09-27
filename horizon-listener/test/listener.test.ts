@@ -1,6 +1,6 @@
 import { HorizonListener } from '../src/listener';
 import type { EventSource, RawContractEvent } from '../src/eventSource';
-import { computeBackoffDelayMs } from '../src/backoff';
+import { computeBackoffDelayMs } from '@compliance-adapters/backoff';
 
 function makeLogger() {
   return { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
@@ -84,8 +84,8 @@ describe('HorizonListener', () => {
 
     const startPromise = listener.start();
 
-    const firstDelay = computeBackoffDelayMs(1, { jitter: false });
-    const secondDelay = computeBackoffDelayMs(2, { jitter: false });
+    const firstDelay = computeBackoffDelayMs(0, { jitter: false });
+    const secondDelay = computeBackoffDelayMs(1, { jitter: false });
 
     await jest.advanceTimersByTimeAsync(firstDelay);
     await jest.advanceTimersByTimeAsync(secondDelay);
@@ -124,9 +124,9 @@ describe('HorizonListener', () => {
     });
 
     // Advance through each backoff delay; the listener will retry after each sleep
-    const firstDelay = computeBackoffDelayMs(1, { jitter: false, baseMs: 100, maxMs: 10000 });
-    const secondDelay = computeBackoffDelayMs(2, { jitter: false, baseMs: 100, maxMs: 10000 });
-    const thirdDelay = computeBackoffDelayMs(3, { jitter: false, baseMs: 100, maxMs: 10000 });
+    const firstDelay = computeBackoffDelayMs(0, { jitter: false, baseMs: 100, maxMs: 10000 });
+    const secondDelay = computeBackoffDelayMs(1, { jitter: false, baseMs: 100, maxMs: 10000 });
+    const thirdDelay = computeBackoffDelayMs(2, { jitter: false, baseMs: 100, maxMs: 10000 });
 
     await jest.advanceTimersByTimeAsync(firstDelay);
     await jest.advanceTimersByTimeAsync(secondDelay);
@@ -161,8 +161,8 @@ describe('HorizonListener', () => {
       // about the rejection being "unhandled" while timers are advancing.
     });
 
-    const firstDelay = computeBackoffDelayMs(1, { jitter: false, baseMs: 10, maxMs: 1000 });
-    const secondDelay = computeBackoffDelayMs(2, { jitter: false, baseMs: 10, maxMs: 1000 });
+    const firstDelay = computeBackoffDelayMs(0, { jitter: false, baseMs: 10, maxMs: 1000 });
+    const secondDelay = computeBackoffDelayMs(1, { jitter: false, baseMs: 10, maxMs: 1000 });
 
     await jest.advanceTimersByTimeAsync(firstDelay);
     await jest.advanceTimersByTimeAsync(secondDelay);
@@ -172,7 +172,10 @@ describe('HorizonListener', () => {
   });
 
   it('backfills all historical pages before switching to live polling', async () => {
-    const page1Events = [makeEvent({ id: 'h-1', ledger: 100 }), makeEvent({ id: 'h-2', ledger: 101 })];
+    const page1Events = [
+      makeEvent({ id: 'h-1', ledger: 100 }),
+      makeEvent({ id: 'h-2', ledger: 101 }),
+    ];
     const page2Events = [makeEvent({ id: 'h-3', ledger: 102 })];
     const liveEvent = makeEvent({ id: 'live-1', ledger: 200 });
 
@@ -223,9 +226,7 @@ describe('HorizonListener', () => {
     expect(sleepCalls).toEqual([5000]);
 
     // Verify the backfill-complete log was emitted
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('backfill complete'),
-    );
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('backfill complete'));
   });
 
   it('pages through all historical events without skipping or duplicating at boundaries', async () => {
@@ -489,7 +490,9 @@ describe('HorizonListener', () => {
     };
 
     const event = makeEvent({ id: 'cursor-test' });
-    const getEvents = jest.fn().mockResolvedValueOnce({ events: [event], nextCursor: 'new-cursor' });
+    const getEvents = jest
+      .fn()
+      .mockResolvedValueOnce({ events: [event], nextCursor: 'new-cursor' });
 
     const eventSource: EventSource = { getEvents };
     const onEvent = jest.fn(async () => {
@@ -557,9 +560,7 @@ describe('HorizonListener', () => {
   it('handles onEventFailure callback errors without interrupting the listener', async () => {
     const eventA = makeEvent({ id: 'evt-1' });
 
-    const getEvents = jest
-      .fn()
-      .mockResolvedValueOnce({ events: [eventA], nextCursor: 'cursor-1' });
+    const getEvents = jest.fn().mockResolvedValueOnce({ events: [eventA], nextCursor: 'cursor-1' });
 
     const eventSource: EventSource = { getEvents };
     const eventError = new Error('event failed');
